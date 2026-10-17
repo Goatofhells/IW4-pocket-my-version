@@ -1,0 +1,5 @@
+/target/
+/build/
+/ios/*.xcodeproj/
+__pycache__/
+.DS_Store
