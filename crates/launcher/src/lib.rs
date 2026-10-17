@@ -4,7 +4,7 @@ unsafe fn input<'a>(p:*const c_char)->Result<&'a str,String> {if p.is_null(){ret
 // All strings are UTF-8, NUL-terminated, valid until the call returns.
 // Every returned pointer must be freed exactly once with iw4_string_free.
 #[no_mangle] pub unsafe extern "C" fn iw4_verify(root:*const c_char,catalog:*const c_char)->*mut c_char {
- let result=(|| {let root=input(root)?; let catalog=input(catalog)?;
+ let result: Result<String, String>=(|| {let root=input(root)?; let catalog=input(catalog)?;
  let manifests:Vec<validation::Manifest>=serde_json::from_str(catalog).map_err(|e|e.to_string())?;
  if manifests.is_empty(){return Err("Unsupported installation: no independently verified MW2 manifests are bundled. Imported files do not prove ownership.".into())}
  for m in manifests {if validation::verify(Path::new(root),&m).is_ok(){return Ok(m.installation)}}
