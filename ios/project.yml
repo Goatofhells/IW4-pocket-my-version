@@ -9,8 +9,8 @@ targets:
     sources:
       - path: IW4Pocket
         excludes: [Info.plist, Bridge.h, Resources]
-    resources:
-      - IW4Pocket/Resources
+      - path: IW4Pocket/Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.iw4pocket.launcher
