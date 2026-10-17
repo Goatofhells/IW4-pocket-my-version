@@ -1,0 +1,87 @@
+name: iOS release
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional new prerelease tag (leave blank for artifacts only)
+        required: false
+        type: string
+  push:
+    branches: ["iw4-pocket-foundation"]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - name: Prepare logs
+        run: mkdir -p build/logs
+      - name: Rust tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --workspace 2>&1 | tee build/logs/rust-tests.log
+      - name: Verify project and IPA checker tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py' -v
+      - name: Build Rust ARM64 static library
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo build --release --target aarch64-apple-ios -p launcher 2>&1 | tee build/logs/rust-ios.log
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec ios/project.yml
+      - name: Build native iOS application
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/IW4Pocket.xcodeproj -scheme IW4Pocket -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build/logs/xcodebuild.log
+      - name: Package and verify unsigned IPA
+        run: |
+          mkdir -p build/package/Payload
+          cp -R build/DerivedData/Build/Products/Release-iphoneos/IW4Pocket.app build/package/Payload/
+          cd build/package
+          /usr/bin/ditto -c -k --keepParent Payload ../IW4Pocket-unsigned.ipa
+          cd ../..
+          python3 tools/verify_ipa.py build/IW4Pocket-unsigned.ipa
+          xcrun dwarfdump --uuid build/package/Payload/IW4Pocket.app/IW4Pocket
+          xcrun otool -L build/package/Payload/IW4Pocket.app/IW4Pocket > build/logs/linked-libraries.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs
+          path: build/logs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IW4Pocket-unsigned
+          path: build/IW4Pocket-unsigned.ipa
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-lockfile
+          path: Cargo.lock
+  prerelease:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+    needs: build
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: IW4Pocket-unsigned
+      - name: Publish optional prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          gh release create "$RELEASE_TAG" IW4Pocket-unsigned.ipa --target "$COMMIT" --prerelease --title "IW4 Pocket $RELEASE_TAG" --notes 'Unsigned ARM64 iOS launcher. Requires appropriate code signing for installation. No playable runtime included.'

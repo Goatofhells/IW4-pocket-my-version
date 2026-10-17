@@ -1,0 +1,30 @@
+name: IW4Pocket
+options:
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  IW4Pocket:
+    type: application
+    platform: iOS
+    sources:
+      - path: IW4Pocket
+        excludes: [Info.plist, Bridge.h, Resources]
+      - path: IW4Pocket/Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.iw4pocket.launcher
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ARCHS: arm64
+        INFOPLIST_FILE: IW4Pocket/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: IW4Pocket/Bridge.h
+        LIBRARY_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../target/aarch64-apple-ios/release"
+        OTHER_LDFLAGS: "$(inherited) -llauncher -lresolv -liconv"
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  IW4Pocket:
+    build:
+      targets:
+        IW4Pocket: all
